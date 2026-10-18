@@ -1,0 +1,67 @@
+services:
+  # ---- Nginx Layer 7 load balancer (open source) ----
+  lb:
+    image: nginx:1.24-alpine
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount the *whole conf.d mount point* to the host's standalone config
+      # directory: our nginx.conf is a full main config (events + http
+      # blocks), but Docker Nginx expects a server-only snippet in conf.d,
+      # so for `docker compose` use the Docker-shaped variant below.
+      - ./nginx/docker-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api-1:
+        condition: service_started
+      api-2:
+        condition: service_started
+      api-3:
+        condition: service_started
+
+  # ---- Three identical FormForge API instances ----
+  # Build: TypeScript sources are compiled inside the image (`tsc` produces
+  # dist/; node runs dist/server.js). tsconfig emits to dist with rootDir=src.
+  api-1:
+    build: .
+    environment:
+      PORT: 3001
+      INSTANCE_ID: api-1
+      TRUST_PROXY: loopback
+      ENABLE_TEST_ENDPOINTS: "true"
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  api-2:
+    build: .
+    environment:
+      PORT: 3002
+      INSTANCE_ID: api-2
+      TRUST_PROXY: loopback
+      ENABLE_TEST_ENDPOINTS: "true"
+    ports:
+      - "3002:3002"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3002/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  api-3:
+    build: .
+    environment:
+      PORT: 3003
+      INSTANCE_ID: api-3
+      TRUST_PROXY: loopback
+      ENABLE_TEST_ENDPOINTS: "true"
+    ports:
+      - "3003:3003"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3003/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 3

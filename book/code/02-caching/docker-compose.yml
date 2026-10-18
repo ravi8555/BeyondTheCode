@@ -1,0 +1,27 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    # Cache data is disposable: persistence would only add I/O noise.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: formforge_dev
+      POSTGRES_PASSWORD: formforge_dev  # local dev only (see chapter 02, s.5)
+      POSTGRES_DB: formforge
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U formforge_dev -d formforge"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

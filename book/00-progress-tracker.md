@@ -8,7 +8,7 @@ Filename convention per chapter: `PART-FOLDER/NN-kebab-name.md` (numbers match t
 |---|---|---|---|
 | **Part I — Traffic Management and Deployment** ||||
 | 01 | Rate Limiting | ✍ | Chapter written; runnable code in `code/01-rate-limiting/` |
-| 02 | Caching | ⬜ | |
+| 02 | Caching | ✍ | Chapter written; runnable code in `code/02-caching/` (typecheck + 13 tests passed against real Redis + PostgreSQL; visible-skip/no-infra path verified) |
 | 03 | Load Balancing | ⬜ | |
 | 04 | Reverse Proxies | ⬜ | |
 | 05 | API Gateways | ⬜ | |

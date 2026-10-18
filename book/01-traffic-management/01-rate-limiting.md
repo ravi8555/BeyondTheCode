@@ -450,6 +450,8 @@ export function slidingWindowLimiter(redis: Redis): Limiter {
 ```typescript
 import type { Request, Response, NextFunction } from 'express';
 import type { Limiter } from '../limiter/types.js';
+import { logger as defaultLogger } from '../logger.js';   // pino
+import { metrics as defaultMetrics } from '../metrics.js'; // counter registry
 
 export interface RateLimitRule {
   name: string;                       // appears in logs/metrics
@@ -459,19 +461,24 @@ export interface RateLimitRule {
   failureMode?: 'fail-open' | 'fail-closed';  // default: fail-closed (safer default)
 }
 
-export function rateLimit(limiter: Limiter, rule: RateLimitRule) {
+export interface RateLimitDeps {           // injectable for tests
+  logger?: { error: (obj: object, msg?: string) => void };
+  metrics?: MetricsSink;
+}
+
+export function rateLimit(limiter: Limiter, rule: RateLimitRule, deps: RateLimitDeps = {}) {
   const failureMode = rule.failureMode ?? 'fail-closed';
+  const log = deps.logger ?? defaultLogger;
+  const counters = deps.metrics ?? defaultMetrics;
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const key = `rl:${rule.name}:${rule.keyBuilder(req)}`;
     let decision;
     try {
       decision = await limiter.check(key, rule.limit, rule.windowMs);
     } catch (err) {
-      // Production: structured logger (pino) + metrics counter, see Section 5.
-      console.error(JSON.stringify({
-        level: 'error', event: 'rate_limit_store_error',
-        rule: rule.name, error: (err as Error).message,
-      }));
+      counters.inc('rate_limit_store_errors_total', { rule: rule.name });
+      log.error({ event: 'rate_limit_store_error', rule: rule.name,
+        error: (err as Error).message }, 'rate limiter store unavailable');
       if (failureMode === 'fail-closed') {
         res.status(503).json({ error: 'rate_limit_unavailable' });
         return;
@@ -483,17 +490,22 @@ export function rateLimit(limiter: Limiter, rule: RateLimitRule) {
     res.setHeader('RateLimit-Remaining', String(decision.remaining));
     if (!decision.allowed) {
       const retryAfterSeconds = Math.max(1, Math.ceil(decision.retryAfterMs / 1000));
+      res.setHeader('RateLimit-Reset', String(retryAfterSeconds)); // delta-seconds until reset
       res.setHeader('Retry-After', String(retryAfterSeconds));
+      counters.inc('rate_limit_decisions_total', { rule: rule.name, action: 'deny' });
       res.status(429).json({
         error: 'rate_limit_exceeded',
         message: `Too many requests. Retry in ${retryAfterSeconds} seconds.`,
       });
       return;
     }
+    counters.inc('rate_limit_decisions_total', { rule: rule.name, action: 'allow' });
     next();
   };
 }
 ```
+
+> The committed middleware increments `rate_limit_decisions_total{rule,action}` on **every** outcome (allow / deny / fail_open_allow / store_error_503) and documents `RateLimit-Reset` as *delta-seconds until the window resets* — the header-standard note in Section 3 applies.
 
 **`src/app.ts`** — wires the limiter into the FormForge route. The full token-bucket implementation (same pattern, `HGETALL`/`HSET` in Lua) lives in [`src/limiter/token-bucket.ts`](../code/01-rate-limiting/src/limiter/token-bucket.ts); its flow is Section 3's step list.
 

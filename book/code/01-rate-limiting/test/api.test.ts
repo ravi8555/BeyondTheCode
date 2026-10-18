@@ -4,22 +4,10 @@ import { Redis } from 'ioredis';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { slidingWindowLimiter } from '../src/limiter/sliding-window.js';
+import { probeRedis } from './helpers/redis.js';
 
-const url = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
-
-let redis: Redis | null = null;
-try {
-  const probe = new Redis(url, {
-    lazyConnect: true,
-    connectTimeout: 500,
-    maxRetriesPerRequest: 1,
-    commandTimeout: 500,
-  });
-  await probe.ping();
-  redis = probe;
-} catch {
-  redis = null;
-}
+// Shared probe (see helpers/redis.ts): visible skips; REQUIRE_REDIS=1 fails CI.
+const redis = await probeRedis();
 
 afterAll(async () => {
   await redis?.quit();
@@ -77,8 +65,8 @@ describe.runIf(redis !== null)('POST /v1/forms/:id/submissions (end-to-end)', ()
   });
 });
 
-describe.runIf(redis === null)('end-to-end suite (Redis unavailable)', () => {
-  it('is skipped — start Redis via `docker compose up -d` and re-run', () => {
+describe.runIf(redis === null)('SKIPPED: end-to-end suite (Redis unreachable)', () => {
+  it('visible skip marker — start Redis via `docker compose up -d` and re-run', () => {
     expect(true).toBe(true);
   });
 });

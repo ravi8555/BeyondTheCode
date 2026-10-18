@@ -1,0 +1,11 @@
+node_modules/
+.env
+*.log
+dist/
+lb-nginx/*.log
+lb-nginx/*.pid
+lb-nginx/*_temp/
+nginx*.zip
+.git/
+.vscode/
+

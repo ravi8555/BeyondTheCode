@@ -3,25 +3,21 @@ import { randomUUID } from 'node:crypto';
 import { Redis } from 'ioredis';
 import { slidingWindowLimiter, install } from '../src/limiter/sliding-window.js';
 import { tokenBucketLimiter } from '../src/limiter/token-bucket.js';
+import { probeRedis } from './helpers/redis.js';
 
-const url = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
-
-let redis: Redis | null = null;
-try {
-  const probe = new Redis(url, {
-    lazyConnect: true,
-    connectTimeout: 500,
-    maxRetriesPerRequest: 1,
-    commandTimeout: 500,
-  });
-  await probe.ping();
-  redis = probe;
-} catch {
-  redis = null; // suite below skips itself
-}
+// Shared probe: disconnects the probe on failure, warns loudly, and throws
+// when REQUIRE_REDIS=1 (CI) — a green run without Redis proves nothing about
+// Redis behavior, so skips must be visible, not silent.
+const redis = await probeRedis();
 
 afterAll(async () => {
   await redis?.quit();
+});
+
+describe.runIf(redis === null)('SKIPPED: Redis integration (Redis unreachable)', () => {
+  it('visible skip marker — start Redis (docker compose up -d) and re-run; REQUIRE_REDIS=1 fails instead of skipping', () => {
+    expect(true).toBe(true);
+  });
 });
 
 describe.runIf(redis !== null)('sliding window limiter (real Redis)', () => {
@@ -98,10 +94,14 @@ describe.runIf(redis !== null)('token bucket limiter (real Redis)', () => {
     const r = redis as unknown as Redis;
     const limiter = tokenBucketLimiter(r, { capacity: 5, refillPerSec: 1 });
     const key = `rl:tb:${randomUUID()}`;
+    // limit/windowMs are IGNORED by the token-bucket implementation —
+    // capacity/refill are its factory-time configuration (see the Limiter
+    // contract in types.ts). 0 here is a documented placeholder, not config.
+    const IGNORED_GENERIC_ARGS = 0;
     for (let i = 0; i < 5; i++) {
-      expect((await limiter.check(key, 0, 0)).allowed).toBe(true);
+      expect((await limiter.check(key, IGNORED_GENERIC_ARGS, IGNORED_GENERIC_ARGS)).allowed).toBe(true);
     }
-    const denied = await limiter.check(key, 0, 0);
+    const denied = await limiter.check(key, IGNORED_GENERIC_ARGS, IGNORED_GENERIC_ARGS);
     expect(denied.allowed).toBe(false);
     expect(denied.retryAfterMs).toBeGreaterThan(0);
   });

@@ -3,11 +3,14 @@ import type { Limiter, RateLimitDecision } from './types.js';
 
 /**
  * Token bucket (chapter 01, section 2.4): capacity = allowed burst,
- * refillPerSec = sustained rate. The check() signature keeps the Limiter
- * interface, so refill/capacity are passed as limit/windowMs equivalents:
- *   limit      -> refillPerSec * 1000 (tokens per window, continuous refill)
- *   windowMs   -> used only for key TTL sizing
- * For clarity this factory takes explicit options instead — see below.
+ * refillPerSec = sustained rate.
+ *
+ * Configuration is EXPLICIT and happens at factory time via
+ * TokenBucketOptions. The generic Limiter.check() `limit` and `windowMs`
+ * parameters are intentionally IGNORED by this implementation (see the
+ * Limiter contract in types.ts): capacity/refill are the real knobs, and
+ * smuggling them through check() per request would be misleading. The
+ * middleware still passes its rule values for interface uniformity.
  */
 
 const TOKEN_BUCKET_LUA = `
@@ -55,9 +58,10 @@ type RedisWithBucket = Redis & {
 };
 
 export interface TokenBucketOptions {
-  capacity: number;      // burst size
-  refillPerSec: number;  // sustained rate
-  ttlMs?: number;        // override key TTL (default: 2x full refill time)
+  /** Burst size. */
+  capacity: number;
+  /** Sustained rate in tokens per second. */
+  refillPerSec: number;
 }
 
 export function tokenBucketLimiter(

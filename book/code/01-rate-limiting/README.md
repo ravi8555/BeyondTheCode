@@ -22,10 +22,15 @@ done
 
 ```bash
 npm run typecheck
-REDIS_URL=redis://127.0.0.1:6379 npm test   # without REDIS_URL, Redis suites skip
+REDIS_URL=redis://127.0.0.1:6379 npm test    # integration suites run
+npm test                                     # without Redis: suites SKIP, visibly
+REQUIRE_REDIS=1 npm test                     # CI mode: unreachable Redis FAILS the run
 ```
+
+Integration suites probe Redis once (`test/helpers/redis.ts`): the probe is disconnected on failure, a `[tests] … SKIPPED` warning is printed, and each file registers a visible `SKIPPED:` suite — a green run without Redis never masquerades as validated Redis behavior.
 
 ## Honest notes
 
 - Code targets Node 20+ / TypeScript 5 / Express 4 / ioredis 5 / Redis 7 (version assumptions; verify against official docs).
-- Production concerns (metrics, alerts, kill switch, HA Redis, headers standard status) are listed in chapter 01, section 5 — intentionally not all wired here to keep the example teachable.
+- Dependencies: `pino` (structured logging, justified by chapter 01 section 5) and a small in-process counter registry (`src/metrics.ts`) standing in for `prom-client` — same name+labels shape, no exposition endpoint.
+- Production concerns beyond this example (metrics exposition, alerts, kill switch, HA Redis, headers-standard status) are listed in chapter 01, section 5.
