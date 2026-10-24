@@ -1,0 +1,28 @@
+{
+  "name": "beyond-the-code-reader",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Book reader UI for Beyond the Code — renders chapters from book/ (Part I content only)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "gen:toc": "python scripts/generate-toc.py"
+  },
+  "dependencies": {
+    "mermaid": "^11.4.1",
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-markdown": "^9.0.3",
+    "rehype-highlight": "^7.0.1",
+    "remark-gfm": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.3"
+  }
+}

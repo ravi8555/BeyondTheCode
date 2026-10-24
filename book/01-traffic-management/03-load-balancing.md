@@ -43,8 +43,6 @@ graph LR
     A3 --> DB
 ```
 
-CHUNK-MARKER-1
-
 The balancer lives at the edge of the app tier: *behind* the CDN/gateway/rate-limiter layers (→ Chapter 01, → Chapter 04, → Chapter 05) and *in front of* the application instances. It owns one decision — *which instance answers* — and one discovery loop — *which instances are currently healthy*.
 
 ### A real-world analogy
@@ -94,8 +92,6 @@ Our example is **Layer 7**: Nginx reads the HTTP request and proxies it, which i
 - Long-lived connections (WebSockets, → Chapter 22) → **least connections**.
 - Must pin a user to one box with no shared store → **IP hash**, and plan the migration to a shared store.
 - Mixed hardware generations → **weighted** round robin, re-measured quarterly.
-
-CHUNK-MARKER-2
 
 ---
 
@@ -162,8 +158,6 @@ Round-robin selection is O(1) per request; failure accounting is O(1) per failed
 | `proxy_connect/read/send_timeout` | `2s` / `5s` / `2s` | Bound how long one sick backend can hold a client. |
 | `keepalive 32` + `proxy_http_version 1.1` + cleared `Connection` | as shown | Reuse upstream connections; without the 1.1 + header lines, `keepalive` silently does nothing. |
 | `client_max_body_size 64k` | as shown | Reject abuse at the cheapest layer. |
-
-CHUNK-MARKER-3
 
 ---
 
@@ -243,8 +237,6 @@ upstream formforge_api {
 ```
 
 > Inside the Compose network, backends are reachable **by service name** (`api-1:3001`). `127.0.0.1` inside the `lb` container would point at Nginx itself — the single most common reason a Compose LB returns 502 on first boot. The host-level `lb-nginx/nginx.conf` uses `127.0.0.1:300x` because there everything shares one loopback.
-
-CHUNK-MARKER-4
 
 ### Implementation (backend — runnable)
 
@@ -369,8 +361,6 @@ curl -s -X POST http://localhost:3001/_test/recover
 docker compose down
 ```
 
-CHUNK-MARKER-5
-
 ### Testing
 
 `test/helpers/infra.ts` probes `127.0.0.1:8080/healthz` once: reachable → suites run; unreachable → loud warning + visible `SKIPPED:` suites; `REQUIRE_INFRA=1` → throw (CI fails instead of skipping).
@@ -414,8 +404,6 @@ What changes before this demo serves real traffic:
 - **Graceful deploys:** rolling restarts with connection draining (`worker_shutdown_timeout`, preStop sleeps in Kubernetes) so in-flight requests finish (→ Chapter 54).
 - **Secrets/config:** instance identity and feature flags via the orchestrator (Compose env → Kubernetes env/Secrets), never baked into images (→ Chapter 67).
 - **Cost:** three always-on instances cost 3× one; autoscale on CPU/latency with a floor of 2 across zones (→ Chapter 45, → Chapter 88).
-
-CHUNK-MARKER-6
 
 ---
 
@@ -476,8 +464,6 @@ CHUNK-MARKER-6
 - **Prevent/mitigate:** ≥2 LB replicas behind DNS round robin / anycast / cloud LB, health-checked independently (→ Chapter 86, Multi-Region Deployment).
 - **Test the fix:** kill the LB and assert traffic fails over (hypothetical in this single-host demo — stated, not shown).
 
-CHUNK-MARKER-7
-
 ---
 
 ## 7. Common Mistakes and Anti-Patterns
@@ -524,8 +510,6 @@ CHUNK-MARKER-7
 - **Correct alternative:** treat Section 4 as *behavioral* proof (algorithm + failover mechanics work) and Section 5 as the checklist before load claims (stated honestly in the README's "Honest notes").
 - **Real-world consequence:** capacity surprises on day one of real traffic.
 
-CHUNK-MARKER-8
-
 ---
 
 ## 8. Performance and Scalability
@@ -564,8 +548,6 @@ curl -s http://localhost:8080/healthz  # LB alive? ("lb ok")
 ```
 
 **Expected failure signals:** 502 through `:8080` with healthy `:300x` → upstream addressing (Case 2). `Exited (1)` API containers → build-layer breakage (Case 3). ~⅓ persistent 500s with no exclusion → missing `http_500` in `proxy_next_upstream` (Case 1). Missing `api-1` right after recovery → normal `fail_timeout` window (Case 5).
-
-CHUNK-MARKER-9
 
 ---
 
@@ -617,8 +599,6 @@ CHUNK-MARKER-9
 *Common wrong answer:* "Restart everything" — masks the config error until the next fresh boot.
 *Follow-up:* how do you keep host-tested and container configs from drifting?
 
-CHUNK-MARKER-10A
-
 ### Level 3 — Judgment
 
 **Q7. When would you choose IP-hash stickiness despite its flaws?**
@@ -667,8 +647,6 @@ CHUNK-MARKER-10A
 *Common wrong answer:* a single bigger box, or "Kubernetes will handle it" without naming the signals that drive it.
 *Follow-up:* what is the first thing that breaks in your design, and what metric tells you first?
 
-CHUNK-MARKER-10B
-
 ---
 
 ## 11. Scenario-Based Engineering Problems
@@ -700,8 +678,6 @@ CHUNK-MARKER-10B
 - **Failure scenarios:** overcorrection starves the slow AZ until its caches go cold, then re-adding it spikes again.
 - **Testing strategy:** synthetic-latency injection per backend, asserting P99 recovery, not count equality.
 
-CHUNK-MARKER-11
-
 ---
 
 ## 12. Hands-On Exercises
@@ -726,8 +702,6 @@ CHUNK-MARKER-11
 - **Beginner:** the README loop *is* the solution; compare your counts against `lb-distribution.test.ts` bounds (12–28 per instance over 60).
 - **Intermediate:** the `lb-failover.test.ts` flow scripted by hand — poison, 15 requests, recover; the ≤6/zero-201 criteria are the test's asserts verbatim.
 - **Advanced:** no single correct answer — acceptable solutions either (a) show the math proving partial poison evades `max_fails=3/10s` at realistic rates and add a correctness-aware readiness probe, or (b) demonstrate latency-based exclusion with measured P99 recovery. Both must include the test they added and its output.
-
-CHUNK-MARKER-12
 
 ---
 

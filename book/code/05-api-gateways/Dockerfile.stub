@@ -1,0 +1,7 @@
+FROM node:22-alpine
+WORKDIR /app
+COPY src/stub.js ./stub.js
+ENV PORT=3000
+ENV SERVICE_NAME=stub
+EXPOSE 3000
+CMD ["node", "stub.js"]

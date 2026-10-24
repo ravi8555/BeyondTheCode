@@ -20,7 +20,7 @@
 - [Chapter 02 — Caching](01-traffic-management/02-caching.md)
 - [Chapter 03 — Load Balancing](01-traffic-management/03-load-balancing.md)
 - [Chapter 04 — Reverse Proxies](01-traffic-management/04-reverse-proxies.md)
-- [Chapter 05 — API Gateways](01-traffic-management/05-api-gateways.md)
+- [Chapter 05 — API Gateways](01-traffic-management/05-api-gateways.md) ✍
 - [Chapter 06 — CI/CD](01-traffic-management/06-cicd.md)
 - [Chapter 07 — Docker](01-traffic-management/07-docker.md)
 - [Chapter 08 — Kubernetes](01-traffic-management/08-kubernetes.md)
