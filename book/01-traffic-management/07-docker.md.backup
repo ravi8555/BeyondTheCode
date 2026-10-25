@@ -1,0 +1,188 @@
+﻿# Chapter 07 â€” Docker
+
+## Learning Objectives
+
+- Containerize a Node.js/Express application using Docker
+- Understand Docker fundamentals: images, containers, Dockerfile, and compose
+- Build production-ready Docker images with multi-stage builds
+- Manage containers with `docker compose` for local development and staging
+- Debug common Docker issues: layer caching, resource limits, networking
+- Integrate Docker into CI/CD pipelines (connecting to Chapter 06)
+- Optimize image size and build time with layer ordering and `.dockerignore`
+
+## 7.1 Docker Fundamentals
+
+### What is Docker?
+
+Docker is a platform for developing, shipping, and running applications inside **containers**. A container is a lightweight, standalone executable package that includes everything needed to run the software: code, runtime, system tools, system libraries, and settings.
+
+### Key Concepts
+
+| Concept | Description |
+|---------|-------------|
+| **Image** | Read-only template with instructions for creating a container. Built via `Dockerfile`. |
+| **Container** | Running instance of an image. Isolated but shares the host OS kernel. |
+| **Dockerfile** | Text file containing commands to assemble an image. `docker build` reads it. |
+| **Docker Compose** | Tool for defining and running multi-container Docker applications via `docker-compose.yml`. |
+| **Registry** | Storage and distribution system for Docker images (GHCR, Docker Hub, ECR, Artifactory). |
+| **Layer** | Each `Dockerfile` instruction creates a layer; layers are cached for faster rebuilds. |
+| **Tag** | Name identifier for an image (e.g., `api-gateway:v1.2.3` or `api-gateway:latest`). |
+
+### Docker vs. Virtual Machines
+
+| Aspect | Docker | Virtual Machine |
+|--------|--------|-----------------|
+| **Guest OS** | Shares host kernel | Full guest OS |
+| **Startup time** | Seconds | Minutes |
+| **Size** | MBs (image layers) | GBs (full OS) |
+| **Isolation** | Process-level | Hardware-level |
+| **Portability** | High (same kernel) | Lower (hypervisor-dependent) |
+
+### Docker Image Lifecycle
+
+```mermaid
+graph TD
+    A[Write Dockerfile] --> B[docker build]
+    B --> C[Image created (layered)]
+    C --> D[docker push <registry>]
+    D --> E[docker pull <registry>]
+    E --> F[docker run]
+    F --> G[Container running]
+    G --> H[docker stop]
+    H --> I[docker rm]
+    I --> J[Image remains in registry]
+```
+
+## 7.2 Dockerfile Best Practices
+
+### Minimalist `Dockerfile` Pattern
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM node:22-alpine AS base
+
+# 1ï¸âƒ£ Set working directory
+WORKDIR /usr/src/app
+
+# 2ï¸âƒ£ Install dependencies (layer cached if package.json unchanged)
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+# 3ï¸âƒ£ Add source code (layer changes on every commit â†’ put last)
+COPY src/ ./src/
+
+# 4ï¸âƒ£ Build TypeScript (production artifacts)
+RUN npx tsc -b
+
+# 5ï¸âƒ£ Expose application port
+EXPOSE 3000
+
+# 6ï¸âƒ£ Start the server
+CMD ["node", "dist/src/app.js"]
+```
+
+### Multi-Stage Build (Recommended for Production)
+
+```dockerfile
+# syntax=docker/dockerfile:1
+# ---- Stage 1: Build ----
+FROM node:22-alpine AS builder
+WORKDIR /usr/src/app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npx tsc -b
+
+# ---- Stage 2: Runtime ----
+FROM node:22-alpine AS base
+WORKDIR /usr/src/app
+# Copy only built artifacts from builder
+COPY --from=builder /usr/src/app/dist ./dist
+COPY package.json ./
+RUN npm ci --omit=dev
+EXPOSE 3000
+CMD ["node", "dist/src/app.js"]
+```
+
+### `.dockerignore` (Mirror of `.gitignore`)
+
+```text
+node_modules
+dist
+.github
+*.log
+*.md
+Dockerfile
+docker-compose.yml
+.travis.yml
+.travis.yml
+.env*
+.git/
+.vscode/
+```
+
+**Why?** Excludes unnecessary files from build context, reducing image size and build time.
+
+## 7.3 `docker compose` for Local Development
+
+### `docker-compose.yml`
+
+```yaml
+version: '3.8'
+services:
+  api-gateway:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      - redis
+    volumes:
+      - ./src:/usr/src/app/src:ro
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:stable-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
+```
+
+### Common `docker compose` commands
+
+| Command | Description |
+|---------|-------------|
+| `docker compose up -d` | Start all services in detached mode |
+| `docker compose down` | Stop and remove containers, networks, volumes |
+| `docker compose logs` | View output from all services |
+| `docker compose exec <service> <cmd>` | Run a command inside a running service |
+| `docker compose ps` | List running services |
+| `docker compose build` | Rebuild images (without starting containers) |
+| `docker compose pull` | Pull image versions without creating containers |
+
+### Health Checks
+
+```yaml
+services:
+  api-gateway:
+    ...
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+```
