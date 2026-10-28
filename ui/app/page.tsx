@@ -1,13 +1,22 @@
 import Link from 'next/link';
-import { availableChapters, partFor } from '@/lib/chapters';
+import { availableChapters, readChapter, chapterStats } from '@/lib/chapters';
 import { TOC, ALL_CHAPTERS } from '@/lib/toc-data';
 
 const PART_OBJECTIVE =
   'Protect services from overload, route and shape traffic, deliver code safely, and make unreliable networks usable.';
 
-export default function Home() {
+export default async function Home() {
   const available = availableChapters();
   const partI = available.filter((m) => m.part.id === 1);
+
+  // Enrich chapters with real stats from markdown content
+  const chaptersWithStats = await Promise.all(
+    partI.map(async ({ chapter }) => {
+      const meta = readChapter(chapter.slug);
+      const stats = meta ? chapterStats(meta.markdown) : null;
+      return { chapter, stats };
+    })
+  );
 
   return (
     <main className="home">
@@ -25,21 +34,35 @@ export default function Home() {
       <section>
         <h2 className="section-title">Part I — Traffic Management and Deployment</h2>
         <div className="chapter-cards">
-          {partI.map(({ chapter, part }) => (
-            <Link
-              key={chapter.slug}
-              href={`/chapter/${chapter.slug}`}
-              className="chapter-card"
-              aria-label={`Read ${chapter.title} — Chapter ${chapter.number}`}
-            >
-              <div className="card-num">Chapter {chapter.number}</div>
-              <h3>{chapter.title}</h3>
-              <p>Read Chapter {chapter.number} — {chapter.title}</p>
-              <div className="card-meta">
-                Part {part.roman} · Traffic Management
-              </div>
-            </Link>
-          ))}
+          {chaptersWithStats.map(({ chapter, stats }) => {
+            const isNew = chapter.number >= 10;
+            return (
+              <Link
+                key={chapter.slug}
+                href={`/chapter/${chapter.slug}`}
+                className={`chapter-card${isNew ? ' new' : ''}`}
+                aria-label={`Read ${chapter.title} — Chapter ${chapter.number}`}
+              >
+                <div className="card-header">
+                  <div className="card-num">Chapter {chapter.number}</div>
+                  {isNew && <span className="card-badge">NEW</span>}
+                </div>
+                <h3>{chapter.title}</h3>
+                <p className="card-excerpt">
+                  {stats?.excerpt || `Read Chapter ${chapter.number} — ${chapter.title}`}
+                </p>
+                <div className="card-stats">
+                  <span className="stat">{stats?.sections?.length || 0} sections</span>
+                  <span className="sep">·</span>
+                  <span className="stat">{stats?.minutes || 0} min read</span>
+                  <span className="sep">·</span>
+                  <span className="stat">
+                    {stats?.words?.toLocaleString() || 0} words
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </section>
 

@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: formforge-api
+  namespace: staging
+  labels:
+    app: formforge-api
+    app.kubernetes.io/name: formforge-api
+    app.kubernetes.io/part-of: formforge
+    app.kubernetes.io/managed-by: argocd
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: formforge-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: formforge-api
+        app.kubernetes.io/name: formforge-api
+        app.kubernetes.io/version: "{{ deploy_version }}"
+    spec:
+      serviceAccountName: formforge-sa
+      containers:
+        - name: formforge-api
+          image: ghcr.io/formforge/ci-cd-example:{{ deploy_version }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: DEPLOY_VERSION
+              value: "{{ deploy_version }}"
+            - name: TRUST_PROXY
+              value: "loopback"
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: formforge-secrets
+                  key: redis-url
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: formforge-secrets
+                  key: database-url
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 3
+            periodSeconds: 2
+            failureThreshold: 30
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: formforge-api
+  namespace: staging
+  labels:
+    app: formforge-api
+    app.kubernetes.io/name: formforge-api
+spec:
+  type: ClusterIP
+  selector:
+    app: formforge-api
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 3000
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: formforge-sa
+  namespace: staging
