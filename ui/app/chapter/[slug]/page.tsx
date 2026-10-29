@@ -15,7 +15,7 @@ export default async function ChapterPage({
 
   if (!chapterMeta) {
     return (
-      <main className="home">
+      <main className="home page-dark">
         <div className="hero">
           <div className="eyebrow">Beyond the Code · Book Reader</div>
           <h1>Not available</h1>
@@ -38,7 +38,7 @@ export default async function ChapterPage({
   const next = idx < all.length - 1 ? all[idx + 1] : null;
 
   return (
-    <div className="chapter-page">
+    <div className="chapter-page page-dark">
       <aside className="toc-rail">
         <div className="toc-title">On this page</div>
         <ol>
@@ -50,7 +50,7 @@ export default async function ChapterPage({
         </ol>
       </aside>
 
-      <div className="article-body">
+      <div className="article-body page-dark">
         <ChapterTitle chapter={chapter} part={part} />
         <ChapterMeta
           stats={{

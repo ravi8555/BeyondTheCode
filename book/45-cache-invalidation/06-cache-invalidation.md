@@ -1,0 +1,26 @@
+## 11. Scenario-Based Engineering Problems
+
+- **Scenario 1:** You push a new version of the checkout service. Users report "double charges". The DB writes are correct.
+  - *Problem statement:* The edge cache returned a stale "order already paid" response.
+  - *Constraints:* Cannot change the DB schema.
+  - *Options:* (a) Add a version tag to the cached order; (b) Invalidate the order cache on any payment write; (c) Increase TTL to 60s.
+  - *Recommended solution:* Add a version tag to the cached order record; invalidate the entire order cache on payment write.
+  - *Alternatives/trade-offs:* (a) is more efficient but requires coordination at read time; (b) is simpler but may cause cache misses.
+  - *Failure scenarios:* Tag check fails; stale version is served.
+  - *Testing strategy:* Load test with concurrent payments and reads; verify no double charges.
+- **Scenario 2:** A billing service uses a Redis cluster. During a deploy, one node is down. The billing service sends 10k invalidation events. The node rejoins 5 minutes later. The DB is now in a different state.
+  - *Problem statement:* Events delivered out of order; some invalidations applied to stale data.
+  - *Constraints:* Cannot stop the deploy.
+  - *Options:* (a) Drop all events and re-initiate; (b) Replay on rejoin with version check; (c) Sacrifice consistency for latency.
+  - *Recommended solution:* Replay on rejoin with version check (b).
+  - *Alternatives/trade-offs:* (a) is fast but loses all invalidations; (b) is correct but adds latency.
+  - *Failure scenarios:* Node misses the version checkpoint; replay floods cache.
+  - *Testing strategy:* Inject a DB version change during replay; verify the node applies correctly.
+- **Scenario 3:** The team wants to use cache invalidation to implement "user A saw user B's message" (who is a private message). They set a single invalidation topic `user:{id}` for every message.
+  - *Problem statement:* Every message triggers a global invalidation; 1000 messages/s → 1000 global broadcasts.
+  - *Constraints:* Cannot change the messaging protocol.
+  - *Options:* (a) Invalidate a per-user message cache key; (b) Accept the O(N) broadcast; (c) Invalidate a "bulk" key that all users poll.
+  - *Recommended solution:* Invalidate a per-user message cache key.
+  - *Alternatives/trade-offs:* (b) is simple but slow; (c) is eventually consistent but may miss messages.
+  - *Failure scenarios:* A user sees a stale message (incorrect).
+  - *Testing strategy:* Load test with 1000 messages/s; verify every user sees their messages.
